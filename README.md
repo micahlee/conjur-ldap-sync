@@ -36,57 +36,66 @@ by CyberArk**. For more detailed information on our certification levels, see [o
     bind-dn: cn=admin,dc=example,dc=org
     bind-password-file: ./ldap-bind-password.txt
 
-    # Conjur server connection settings
-    conjur-url: https://conjur.mycompany.net
-    conjur-ca-cert-file: ./conjur-ca-cert.pem
-    conjur-account: default
-    conjur-username: admin
-    conjur-password-file: ./conjur-password.txt
-
     # Sync configuration
     base-dn: dc=example,dc=org
     group-filter: (objectClass=posixGroup)
+    group-name-attribute: cn
     user-filter: (objectClass=posixUser)
-    policy-load-path: root
+    user-name-attribute: uid
+    ```
+
+    *NOTE:* If you are migrating from the legacy DAP LDAP Sync, you may view
+    the values for most of these values by running the command:
+
+    ```sh
+    conjur show <my-account>:configuration:conjur/ldap-sync/default
     ```
 
 2. Store large and/or sensitive values in files:
     - `./ldap-ca-cert.pem`: LDAP server CA certificate
     - `./ldap-bind-password.txt`: LDAP bind password
-    - `./conjur-ca-cert.pem`: Conjur server CA certificate
-    - `./conjur-password.txt`: Conjur login password
 
-3. Run LDAP sync with dry run
+3. Run LDAP sync to display the policy
 
     Execute the command:
 
     ```sh
-    conjur-ldap-sync --config-file="ldap-sync.yaml" --dry-run
+    conjur-ldap-sync policy show
     ```
 
-4. View the generated policy documents in the `./policy` directory to inspect
-   their contents.
-  
-5. Sync LDAP groups and users into Conjur
-
-    Once satisfied with the outcome of the selected search filters and policy
-    output, perform the sync by running `conjur-ldap-sync` without the `--dry-run`
-    flag.
+    *NOTE:* The default configuration filename is `./ldap-sync.yaml`. If your
+    configuration file is named something else or located in another directory,
+    specify the path to it with the `--config-file` flag. For example:
 
     ```sh
-    conjur-ldap-sync --config-file="ldap-sync.yaml"
+    conjur-ldap-sync policy show --config-file="my-ldap-sync-config.yaml"
     ```
 
-6. Verify groups and users exist in Conjur
+4. Sync LDAP groups and users into Conjur
+
+    Once satisfied with the outcome of the selected search filters and policy
+    output, perform the sync by loading the generated policy in Conjur
+
+    ```sh-session
+    $ conjur-ldap-sync policy show | tee policies/ldap.yaml
+    ...
+    $ conjur policy load root policies/ldap.yaml
+    ```
+
+5. Verify groups and users exist in Conjur
+
+    This may be accomplished by running:
+
+    ```sh
+    conjur list
+    ```
 
 ### Command line interface (CLI)
 
 The base `conjur-ldap-sync` command will connect to the configured LDAP server
-to read the groups, users, and their memberships. It will then load these into
-Conjur by loading generated policy documents.
-
-The `--dry-run` run command causes `conjur-ldap-sync` to instead write the
-resulting policy documents to files instead of attempting to load them in Conjur.
+to read the groups, users, and memberships. It then generates the Conjur
+policy to define these Users and Groups so they can be used in secrets
+management policy.
 
 ### Windows service
 
@@ -201,6 +210,14 @@ values available.
       </tr>
       <tr>
          <td>
+            Group Name Attribute <br>
+            <code>group-name-attribute</code>
+         </td>
+         <td>LDAP attribute to use for the group name in Conjur.</td>
+         <td><code>cn</code></td>
+      </tr>
+      <tr>
+         <td>
             User Filter <br>
             <code>user-filter</code>
          </td>
@@ -209,65 +226,11 @@ values available.
       </tr>
       <tr>
          <td>
-            Conjur Server URL <br>
-            <code>conjur-url</code>
+            User Name Attribute <br>
+            <code>user-name-attribute</code>
          </td>
-         <td>URL to use when connecting to the Conjur server</td>
-         <td><code>https://conjur.mycompany.net</code></td>
-      </tr>
-      <tr>
-         <td>
-            Conjur CA Certificate <br>
-            <code>conjur-ca-cert-file</code>
-         </td>
-         <td>
-         The PEM encoded, x.509 certificate to verify the Conjur server
-         connection with.
-         </td>
-         <td>
-            <pre style="white-space: pre">
------BEGIN CERTIFICATE-----
-...
------END CERTIFICATE-----</pre>
-         </td>
-      </tr>
-      <tr>
-         <td>
-            Conjur Account <br>
-            <code>conjur-account</code>
-         </td>
-         <td>Conjur account to use.</td>
-         <td><code>default</code></td>
-      </tr>
-      <tr>
-         <td>
-            Conjur LDAP Sync Base Policy <br>
-            <code>policy-load-path</code>
-         </td>
-         <td>Conjur policy path to load groups and users into.</td>
-         <td><code>root</code></td>
-      </tr>
-      <tr>
-         <td>
-            Conjur Username <br>
-            <code>conjur-username</code>
-         </td>
-         <td>
-            Username to authenticate to Conjur with. This user must have to load
-            policy at the configured base policy path.
-         </td>
-         <td></td>
-      </tr>
-      <tr>
-         <td>
-            Conjur Password / API Key <br>
-            <code>conjur-password-file</code>, <code>CONJUR_AUTHN_PASSWORD</code>*,
-            <code>CONJUR_AUTHN_API_KEY</code>*
-         </td>
-         <td>
-            Credentials to authenticate to Conjur with.
-         </td>
-         <td></td>
+         <td>LDAP attribute to use for the group name in Conjur.</td>
+         <td><code>cn</code></td>
       </tr>
    </tbody>
 </table>
@@ -283,19 +246,6 @@ Configuration values available to control the behavior of `conjur-ldap-sync` are
       </tr>
    </thead>
    <tbody>
-      <tr>
-         <td>
-            Dry Run <br>
-            <code>dry-run</code>
-         </td>
-         <td>
-         Normally, <code>conjur-ldap-sync</code> loads generated group and user
-         policy directly into Conjur. Configuring <code>dry-run</code> causes
-         the policy files to be written as files under the `policy/` subdirectory
-         instead of loading them into Conjur.
-         </td>
-         <td></td>
-      </tr>
       <tr>
          <td>
             Sync Batch Size <br>
@@ -316,26 +266,22 @@ LDAP sync parameters can be provided in one of three ways:
 - As individual configuration flags on the `conjur-ldap-sync` command.
 - As a YAML configuration file provided to the `conjur-ldap-sync` command with
   the `--config-file` flag.
-- As a Conjur policy object provided to the `conjur-ldap-sync` command with
-  the `--config-resource` flag.
 
 #### Command Line Arguments
 
 Any arguments provided on the command line take precedence over values in
 the config file or Conjur configuration resource.
 
-Configuration parameters for sensitive values, such as the Conjur login password
-and LDAP bind password cannot be provided directly as flag values, but may be
-passed to the command as environment variables or file paths.
+Configuration parameters for sensitive values, such as the LDAP bind password
+cannot be provided directly as flag values, but may be passed to the command as
+environment variables or file paths.
 
 An example of using command line flags for all arguments is below. Note that
 password values are provided as environment variables, not CLI flags.
 
 ```sh
-conjur-ldap-sync \
-   --conjur-appliance-url="https://conjur.my-company.local" \
-   --conjur-ca-file="conjur-ca.pem" \
-   --conjur-password-file="conjur-password.txt" \
+conjur-ldap-sync policy show \
+   --bind-password-file="ldap-password.txt" \
    ...
 ```
 
@@ -343,15 +289,26 @@ conjur-ldap-sync \
 
 ```yaml
 # ldap-sync.yml
-conjur-appliance-url: https://conjur.my-company.local
-conjur-ca-file: conjur-ca.pem
+# LDAP server connection settings
+    ldap-host: ldap-server.mycompany.net
+    ldap-port: 389
+    connection-type: tls
+    ldap-ca-cert-file: ./ldap-ca-cert.pem
+    bind-dn: cn=admin,dc=example,dc=org
+    bind-password-file: ./ldap-bind-password.txt
+
+    # Sync configuration
+    base-dn: dc=example,dc=org
+    group-filter: (objectClass=posixGroup)
+    group-name-attribute: cn
+    user-filter: (objectClass=posixUser)
+    user-name-attribute: uid
 ```
 
 ```sh
 env 
-   CONJUR_AUTHN_PASSWORD=$(<conjur_password_file) \
    LDAP_BIND_PASSWORD=$(<ldap_password_file) \
-conjur-ldap-sync \
+conjur-ldap-sync policy show \
    --config-file="ldap-sync.yml"
 ```
 
@@ -362,64 +319,12 @@ to provide the password values from the secure operating system store.
 
 ```yaml
 # secrets.yml
-CONJUR_AUTHN_PASSWORD: !var ldap-sync/conjur-password
 LDAP_BIND_PASSWORD: !var ldap-sync/bind-password
 ```
 
 ```sh
 summon -p keyring.py \
-   conjur-ldap-sync --config-file="ldap-sync.yml"
-```
-
-#### Configuration in Conjur Policy
-
-Configuring LDAP sync from a Conjur resource is provided to support backwards
-compatibility with older entrprise LDAP sync configurations. To use this option,
-you must have an existing policy `/conjur/ldap-sync` in Conjur with content
-similar to:
-
-```yaml
-- !host
-- !webservice
-  owner: !host
-- !group
-  owner: !host
-
-- !resource
-  id: default
-  owner: !host
-  kind: configuration
-  annotations:
-    ldap-sync/base_dn: dc=example,dc=org
-    ldap-sync/bind_dn: cn=admin,dc=example,dc=org
-    ldap-sync/connect_type: tls
-    ldap-sync/host: ldap-server
-    ldap-sync/port: 389
-    ldap-sync/group_attribute_mapping/name: cn
-    ldap-sync/user_attribute_mapping/name: cn
-    ldap-sync/group_filter: (objectClass=Group)
-    ldap-sync/user_filter: (objectClass=User)
-    
-- !variable
-  id: bind-password/default
-  owner: !host
-
-- !variable
-  id: tls-ca-cert/default
-  owner: !host
-```
-
-If so, Conjur LDAP sync can read these configuration values and use them to
-connect to LDAP. In this case, only the Conjur configuration values are required.
-
-```sh
-env CONJUR_AUTHN_PASSWORD=$(<conjur_password_file) \
-   conjur-ldap-sync \
-      --conjur-appliance-url="https://conjur.my-company.local" \
-      --conjur-ca-file="conjur-ca.pem" \
-      --conjur-password-file="conjur-password.txt" \
-      ...
-      --config-resource="default"
+   conjur-ldap-sync policy show
 ```
 
 ### Policy Templates
